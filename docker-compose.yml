@@ -1,9 +1,28 @@
-version: '3.8'
+version: '3.9'
 
 services:
-  postgres:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://challenge:challenge_2024@db:5432/challenge_db
+    depends_on:
+      - db
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+
+  db:
     image: postgres:15
-    container_name: godlevel-db
     environment:
       POSTGRES_DB: challenge_db
       POSTGRES_USER: challenge
@@ -12,48 +31,6 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./database-schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U challenge -d challenge_db"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-  data-generator:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: godlevel-data-gen
-    depends_on:
-      postgres:
-        condition: service_healthy
-    environment:
-      DATABASE_URL: postgresql://challenge:challenge_2024@postgres:5432/challenge_db
-    command: >
-      sh -c "
-        echo 'Waiting for database to be ready...' &&
-        sleep 5 &&
-        echo 'Generating challenge data...' &&
-        python generate_data.py --db-url postgresql://challenge:challenge_2024@postgres:5432/challenge_db
-      "
-    profiles:
-      - tools
-
-  pgadmin:
-    image: dpage/pgadmin4:latest
-    container_name: godlevel-pgadmin
-    environment:
-      PGADMIN_DEFAULT_EMAIL: admin@godlevel.com
-      PGADMIN_DEFAULT_PASSWORD: admin
-      PGADMIN_CONFIG_SERVER_MODE: 'False'
-    ports:
-      - "5050:80"
-    depends_on:
-      - postgres
-    profiles:
-      - tools
 
 volumes:
   postgres_data:
-    driver: local
-
